@@ -1,0 +1,9 @@
+# Dependencies
+
+# VSCode
+.vscode/*
+
+# bin
+bin/*
+
+!.keep

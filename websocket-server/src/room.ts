@@ -1,60 +1,68 @@
 export class Room {
   private id!: string;
-  private sockets!: Map<string, WebSocket>;
-  private messages!: { id: string; createdAt: Date; message: string; }[];
+
+  private sockets!: Map<string, { socket: WebSocket; userId: string; }>;
 
   constructor(roomId: string) {
     this.id = roomId;
+
     this.sockets = new Map();
-    this.messages = [];
   }
 
   get roomId() {
     return this.id;
   }
 
-  private getMessages(): { id: string; message: string; createdAt: number; }[] {
-    return this.messages
-      .sort(({ createdAt: a }, { createdAt: b }) => b.getTime() - a.getTime())
-      .slice(0, 10)
-      .map(
-        ({ message, id, createdAt }) => ({ id, message, createdAt: createdAt.getTime() }),
-      );
+  private get userIds(): string[] {
+    return [...new Set([...this.sockets.values()].map(({ userId }) => (userId)))];
   }
 
-  private broadcast(sourceId: string) {
-    this.sockets.forEach((target, targetId) => {
-      console.log(target.readyState);
-      if (target.readyState !== WebSocket.OPEN) {
+  private get users(): { userId: string; }[] {
+    return this.userIds.map((userId) => ({ userId }));
+  }
+
+  private get roomSize(): number {
+    return this.users.length;
+  }
+
+  private broadcast() {
+    const roomSize = this.roomSize;
+    const users = this.users;
+
+    this.sockets.forEach(({ socket }) => {
+      if (socket.readyState !== WebSocket.OPEN) {
         return;
       }
 
       const payload = {
-        sourceId: sourceId,
-        targetId: targetId,
-        roomSize: this.sockets.size,
-        messages: this.getMessages(),
+        roomSize: roomSize,
+        users: users,
       };
-      target.send(JSON.stringify(payload));
+      socket.send(JSON.stringify(payload));
     });
   }
 
-  addSocket(ws: WebSocket) {
-    const uid = crypto.randomUUID();
+  addSocket(socket: WebSocket, userId: string) {
+    const socketId = crypto.randomUUID();
 
-    ws.addEventListener("open", () => {
-      this.sockets.set(uid, ws);
-      this.broadcast(uid);
-    });
-    ws.addEventListener(
+    socket.addEventListener(
+      "open",
+      (event) => {
+        this.sockets.set(socketId, { socket: socket, userId });
+        this.broadcast();
+      },
+    );
+    socket.addEventListener(
       "message",
       (event) => {
-        this.messages.push({
-          id: crypto.randomUUID(),
-          createdAt: new Date(),
-          message: Math.random().toString(23),
-        });
-        this.broadcast(uid);
+        this.broadcast();
+      },
+    );
+    socket.addEventListener(
+      "close",
+      (event) => {
+        this.sockets.delete(socketId);
+        this.broadcast();
       },
     );
   }

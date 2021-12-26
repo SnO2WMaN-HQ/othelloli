@@ -4,8 +4,17 @@ import { Application, Router } from "https://deno.land/x/oak/mod.ts";
 
 import { rooms } from "./rooms.ts";
 
+import { handleLogin } from "./login.ts";
+
 const app = new Application();
 const router = new Router();
+
+router.get("/login", async (context) => {
+  const userId = context.request.url.searchParams.get("userId");
+
+  const socket = await context.upgrade();
+  handleLogin(socket, userId);
+});
 
 router.get("/rooms", (context) => {
   context.response.body = {
@@ -15,15 +24,12 @@ router.get("/rooms", (context) => {
 
 router.get("/rooms/:id", async (context) => {
   const { id: roomId } = context.params;
+  const userId = context.request.url.searchParams.get("userId");
+
+  if (!userId) return;
+
   const socket = await context.upgrade();
-  rooms.getRoom(roomId).addSocket(socket);
-});
-
-router.post("/rooms/:id", (context) => {
-  const { id: roomId } = context.params;
-  rooms.createNewRoom(roomId);
-
-  context.response.status = 200;
+  rooms.getRoom(roomId).addSocket(socket, userId);
 });
 
 app.use(oakCors());

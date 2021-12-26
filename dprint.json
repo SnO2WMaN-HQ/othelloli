@@ -19,7 +19,7 @@
     "bracketSpacing": true
   },
   "includes": ["**/*.{ts,tsx,js,jsx,cjs,mjs,json,md,toml,yml,yaml}"],
-  "excludes": ["**/node_modules"],
+  "excludes": ["**/node_modules", "**/pnpm-lock.yaml"],
   "plugins": [
     "https://plugins.dprint.dev/typescript-0.57.2.wasm",
     "https://plugins.dprint.dev/json-0.13.0.wasm",

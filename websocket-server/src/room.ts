@@ -1,7 +1,9 @@
+import { Board } from "./board.ts";
 export class Room {
-  private id!: string;
+  private id: string;
 
-  private sockets!: Map<string, { socket: WebSocket; userId: string; }>;
+  private sockets: Map<string, { socket: WebSocket; userId: string; }>;
+  private board: Board | undefined;
 
   constructor(roomId: string) {
     this.id = roomId;
@@ -21,24 +23,33 @@ export class Room {
     return this.userIds.map((userId) => ({ userId }));
   }
 
-  private get roomSize(): number {
-    return this.users.length;
+  private openGame() {
+    const userIds = this.userIds;
+    const roomSize = userIds.length;
+
+    if (this.board || roomSize < 2) return;
+
+    this.board = new Board(this.userIds);
   }
 
   private broadcast() {
-    const roomSize = this.roomSize;
     const users = this.users;
+    const roomSize = users.length;
 
     this.sockets.forEach(({ socket }) => {
       if (socket.readyState !== WebSocket.OPEN) {
         return;
       }
 
-      const payload = {
-        roomSize: roomSize,
-        users: users,
-      };
-      socket.send(JSON.stringify(payload));
+      socket.send(JSON.stringify({
+        type: "BROADCAST",
+        data: {
+          roomName: "Room " + this.roomId,
+          roomSize: roomSize,
+          users: users,
+          board: this.board?.info,
+        },
+      }));
     });
   }
 
@@ -49,12 +60,23 @@ export class Room {
       "open",
       (event) => {
         this.sockets.set(socketId, { socket: socket, userId });
+        this.openGame();
         this.broadcast();
       },
     );
     socket.addEventListener(
       "message",
       (event) => {
+        const payload = JSON.parse(event.data);
+        if (payload["type"] === "PLACE_STONE" && this.board) {
+          const userId = payload["userId"];
+          const data = payload["data"];
+          const { x, y } = data;
+          const result = this.board.update(userId, x, y);
+          if (result.status === "bad") {
+            socket.send(JSON.stringify({ type: "NOTIFICATION", message: result.message }));
+          }
+        }
         this.broadcast();
       },
     );

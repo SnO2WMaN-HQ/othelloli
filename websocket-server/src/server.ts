@@ -1,6 +1,7 @@
 import { bold, yellow } from "https://deno.land/std@0.118.0/fmt/colors.ts";
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 import { Application, Router } from "https://deno.land/x/oak/mod.ts";
+import { addSocket as addSocketToRoom } from "./room.ts";
 
 import { rooms } from "./rooms.ts";
 
@@ -29,7 +30,8 @@ router.get("/rooms/:id", async (context) => {
   if (!userId) return;
 
   const socket = await context.upgrade();
-  rooms.getRoom(roomId).addSocket(socket, userId);
+  const room = rooms.getRoom(roomId);
+  addSocketToRoom(socket, userId, room);
 });
 
 app.use(oakCors());

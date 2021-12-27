@@ -1,91 +1,142 @@
-import { Board } from "./board.ts";
-export class Room {
-  private id: string;
+import {
+  Board,
+  createInitStones,
+  getBoardInfo as getBoardInfo,
+  getPlayersIds as getPlayersIdsInBoard,
+  updateBoard,
+} from "./board.ts";
+import { getUserDetails } from "./users.ts";
 
-  private sockets: Map<string, { socket: WebSocket; userId: string; }>;
-  private board: Board | undefined;
+export type Room = {
+  id: string;
+  name: string;
+  sockets: Map<WebSocket, string>;
+  board: Board | undefined;
+};
 
-  constructor(roomId: string) {
-    this.id = roomId;
+export const connectedUsers = (
+  room: Room,
+): string[] => {
+  return Array.from(new Set(room.sockets.values()));
+};
 
-    this.sockets = new Map();
+export const unconnectedUsers = (
+  room: Room,
+): string[] => {
+  const connected = connectedUsers(room);
+  const playerIds = room.board ? getPlayersIdsInBoard(room.board) : [];
+  return playerIds.filter((playerId) => !connected.includes(playerId));
+};
+
+export const expectedUsers = (
+  room: Room,
+): { [userId in string]: { name: string; connected: boolean } } => {
+  const connected = connectedUsers(room);
+  const unconnected = unconnectedUsers(room);
+
+  const userDetails = getUserDetails([...connected, ...unconnected]);
+
+  return Object.fromEntries(
+    Object
+      .entries(userDetails)
+      .map(([userId, userDetails]) => [
+        userId,
+        { ...userDetails, connected: !unconnected.includes(userId) },
+      ]),
+  );
+};
+
+export const startGame = (room: Room):
+  | { status: "ok" }
+  | (
+    & { status: "bad" }
+    & { message: "ALREADY_OPENED" | "NOT_ENOUGH_PLAYERS" }
+  ) => {
+  if (room.board) return { status: "bad", message: "ALREADY_OPENED" };
+
+  const connected = connectedUsers(room);
+  if (connected.length < 2) {
+    return { status: "bad", message: "NOT_ENOUGH_PLAYERS" };
   }
 
-  get roomId() {
-    return this.id;
-  }
+  room.board = {
+    width: 8,
+    height: 8,
+    role: 0,
+    stones: createInitStones(8, 8, 2),
+    players: { [connected[0]]: 0, [connected[1]]: 1 },
+  };
+  return { status: "ok" };
+};
 
-  private get userIds(): string[] {
-    return [...new Set([...this.sockets.values()].map(({ userId }) => (userId)))];
-  }
+export const broadcast = (
+  room: Room,
+): void => {
+  const users = expectedUsers(room);
+  const boardInfo = room.board ? getBoardInfo(room.board) : undefined;
 
-  private get users(): { userId: string; }[] {
-    return this.userIds.map((userId) => ({ userId }));
-  }
+  const sendData = {
+    id: room.id,
+    name: room.name,
+    users: users,
+    board: boardInfo,
+  };
 
-  private openGame() {
-    const userIds = this.userIds;
-    const roomSize = userIds.length;
+  room.sockets.forEach((_, socket) => {
+    if (socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
 
-    if (this.board || roomSize < 2) return;
+    socket.send(JSON.stringify({
+      type: "BROADCAST",
+      data: sendData,
+    }));
+  });
+};
 
-    this.board = new Board(this.userIds);
-  }
+export const addSocket = (
+  socket: WebSocket,
+  userId: string,
+  room: Room,
+) => {
+  socket.addEventListener(
+    "open",
+    (event) => {
+      room.sockets.set(socket, userId);
 
-  private broadcast() {
-    const users = this.users;
-    const roomSize = users.length;
+      const result = startGame(room);
+      console.dir(result);
 
-    this.sockets.forEach(({ socket }) => {
-      if (socket.readyState !== WebSocket.OPEN) {
-        return;
-      }
+      broadcast(room);
+    },
+  );
+  socket.addEventListener(
+    "message",
+    (event) => {
+      const payload = JSON.parse(event.data);
 
-      socket.send(JSON.stringify({
-        type: "BROADCAST",
-        data: {
-          roomName: "Room " + this.roomId,
-          roomSize: roomSize,
-          users: users,
-          board: this.board?.info,
-        },
-      }));
-    });
-  }
+      if (payload["type"] === "PLACE_STONE" && room.board) {
+        const userId = payload["userId"];
+        const data = payload["data"];
+        const { x, y } = data;
 
-  addSocket(socket: WebSocket, userId: string) {
-    const socketId = crypto.randomUUID();
-
-    socket.addEventListener(
-      "open",
-      (event) => {
-        this.sockets.set(socketId, { socket: socket, userId });
-        this.openGame();
-        this.broadcast();
-      },
-    );
-    socket.addEventListener(
-      "message",
-      (event) => {
-        const payload = JSON.parse(event.data);
-        if (payload["type"] === "PLACE_STONE" && this.board) {
-          const userId = payload["userId"];
-          const data = payload["data"];
-          const { x, y } = data;
-          const result = this.board.update(userId, x, y);
-          if (result.status === "bad") {
-            socket.send(JSON.stringify({ type: "NOTIFICATION", message: result.message }));
-          }
+        const result = updateBoard(room.board, userId, x, y);
+        if (result.status === "bad") {
+          socket.send(
+            JSON.stringify({ type: "NOTIFICATION", message: result.message }),
+          );
+        } else {
+          room.board = result.data;
         }
-        this.broadcast();
-      },
-    );
-    socket.addEventListener(
-      "close",
-      (event) => {
-        this.sockets.delete(socketId);
-        this.broadcast();
-      },
-    );
-  }
-}
+      }
+      broadcast(room);
+    },
+  );
+  socket.addEventListener(
+    "close",
+    (event) => {
+      room.sockets.delete(socket);
+      broadcast(room);
+    },
+  );
+};

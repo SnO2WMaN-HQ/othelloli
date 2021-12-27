@@ -1,150 +1,160 @@
-export class Board {
-  readonly width: number;
-  readonly height: number;
+export type Board = {
+  width: number;
+  height: number;
+  players: { [playerId in string]: number };
 
-  private $role: number;
-  readonly stones: number[];
+  role: number;
+  stones: number[];
+};
 
-  private playersMap: Map<string, number>;
+export const createInitStones = (
+  width: number,
+  height: number,
+  colors: number,
+): Board["stones"] => {
+  return [
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    0,
+    1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    1,
+    0,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+  ];
+};
 
-  constructor(players: string[]) {
-    this.width = 8;
-    this.height = 8;
+export const getPlayersIds = (board: Board): string[] => {
+  return Object.keys(board.players);
+};
 
-    this.$role = 0;
-    this.playersMap = new Map(players.map((userId, i) => [userId, i + 1]));
-    this.stones = [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      1,
-      2,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      2,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-    ];
+export const getColors = (board: Board): number[] => {
+  return Object.values(board.players);
+};
+
+export const createNewBoard = (
+  board: Board,
+  index: number,
+): Board => {
+  const stones = board.stones;
+  stones[index] = board.role;
+
+  return {
+    ...board,
+    stones: stones,
+    role: (board.role + 1) % getColors(board).length,
+  };
+};
+
+export const updateBoard = (
+  board: Board,
+  playerId: string,
+  x: number,
+  y: number,
+):
+  | { status: "ok"; data: Board }
+  | (
+    & { status: "bad" }
+    & { message: "NOT_PLAYER" | "NOT_YOUR_TURN" | "CANNOT_PLACE_HERE" }
+  ) => {
+  if (!Object.keys(board.players).includes(playerId)) {
+    return { status: "bad", message: "NOT_PLAYER" };
   }
 
-  private get players() {
-    return Object.fromEntries([...this.playersMap.entries()]);
+  const color = board.players[playerId];
+  if (color !== board.role) {
+    return { status: "bad", message: "NOT_YOUR_TURN" };
   }
 
-  private get colors() {
-    return [...this.playersMap.values()];
-  }
+  const index = board.height * y + x;
+  return { "status": "ok", data: createNewBoard(board, index) };
+};
 
-  private get role() {
-    return this.$role + 1;
-  }
+export const countStones = (
+  board: Board,
+): { [color in number]: number } => {
+  const colors = getColors(board);
 
-  private get counts() {
-    return Object.fromEntries(
-      this.colors.map((color) => [color, this.stones.filter((stone) => stone === color).length]),
-    );
-  }
+  return Object.fromEntries(colors.map(
+    (color) => [
+      color,
+      board.stones.filter((stone) => stone === color).length,
+    ],
+  ));
+};
 
-  get info() {
-    return {
-      width: this.width,
-      height: this.height,
-      players: this.players,
-      role: this.role,
-      stones: this.stones,
-      counts: this.counts,
-    };
-  }
-
-  private checkRole(index: number, role: number): boolean {
-    return true;
-  }
-
-  private place(index: number, role: number): void {
-    this.stones[index] = this.role;
-  }
-
-  private switchRole() {
-    this.$role++;
-    this.$role %= this.colors.length;
-  }
-
-  update(
-    playerId: string,
-    x: number,
-    y: number,
-  ):
-    | (
-      & { status: "bad"; }
-      & ({ message: "NOT_PLAYER"; } | { message: "NOT_YOUR_TURN"; } | { message: "CANNOT_PLACE_HERE"; })
-    )
-    | { status: "ok"; } {
-    const color = this.playersMap.get(playerId);
-
-    if (!color) return { status: "bad", message: "NOT_PLAYER" };
-    if (color !== this.role) return { status: "bad", message: "NOT_YOUR_TURN" };
-
-    const index = this.height * y + x;
-
-    if (!this.checkRole(index, this.role)) return { status: "bad", message: "CANNOT_PLACE_HERE" };
-
-    this.place(index, this.role);
-    this.switchRole();
-
-    return { status: "ok" };
-  }
-}
+export const getBoardInfo = (
+  board: Board,
+): {
+  width: number;
+  height: number;
+  role: number;
+  stones: number[];
+  players: { [x: string]: number };
+  counts: { [x: number]: number };
+} => {
+  return {
+    width: board.width,
+    height: board.height,
+    players: board.players,
+    role: board.role,
+    stones: board.stones,
+    counts: countStones(board),
+  };
+};

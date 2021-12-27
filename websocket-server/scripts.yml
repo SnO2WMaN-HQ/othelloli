@@ -6,4 +6,3 @@ scripts:
   compile:
     desc: Compile server
     cmd: deno compile --allow-env=PORT --allow-net -o ./bin/server ./src/server.ts
-

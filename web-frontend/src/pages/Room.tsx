@@ -13,10 +13,16 @@ export const Room: React.VFC = () => {
   const [room, setRoom] = useState<
     {
       roomName: string;
-      roomSize: number;
-      users: { userId: string; role: number | undefined; }[];
+      users: Record<string, { name: string; connected: boolean; }>;
       board:
-        | { width: number; height: number; role: number; stones: number[]; counts: { [key in number]: number; }; }
+        | {
+          width: number;
+          height: number;
+          stones: number[];
+          role: number;
+          counts: { [color in number]: number; };
+          players: { [userId in string]: number; };
+        }
         | undefined;
     } | undefined
   >(undefined);
@@ -25,31 +31,24 @@ export const Room: React.VFC = () => {
     console.log(message);
   };
   const handleBroadcast = (data: any) => {
-    const roomName = data["roomName"];
-    const roomSize = data["roomSize"];
+    const roomName = data["name"];
     const users = data["users"];
     const board = data["board"];
-    if (board) {
-      setRoom({
-        roomName: roomName,
-        roomSize: roomSize,
-        users: users.map(({ userId, ...rest }: any) => ({ userId, ...rest, role: board.players[userId] })),
-        board: {
+
+    setRoom({
+      roomName: roomName,
+      users,
+      board: board
+        ? {
           width: board["width"],
           height: board["height"],
           role: board["role"],
           stones: board["stones"],
           counts: board["counts"],
-        },
-      });
-    } else {
-      setRoom({
-        roomName: roomName,
-        roomSize: roomSize,
-        users: users,
-        board: undefined,
-      });
-    }
+          players: board["players"],
+        }
+        : undefined,
+    });
   };
 
   const { send } = useWebSocket(
@@ -121,7 +120,6 @@ export const Room: React.VFC = () => {
                   ["h-full"],
                 )}
                 roomName={room.roomName}
-                roomSize={room.roomSize}
                 users={room.users}
                 board={room.board}
               />

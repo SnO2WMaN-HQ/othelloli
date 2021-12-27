@@ -6,9 +6,9 @@ export const stonesParser = (stones: number[], width: number, height: number): n
   return chunk(stones, width);
 };
 
-export const STONE_NONE = 0;
-export const STONE_WHITE = 1;
-export const STONE_BLACK = 2;
+export const STONE_NONE = -1;
+export const STONE_WHITE = 0;
+export const STONE_BLACK = 1;
 
 export const Board: React.VFC<{
   className?: string;
@@ -32,10 +32,12 @@ export const Board: React.VFC<{
           "grid",
           ["gap-x-0.5"],
           ["gap-y-0.5"],
-          ["grid-rows-[repeat(" + board.width + ",_minmax(0,_1fr))]"],
-          ["grid-cols-[repeat(" + board.height + ",_minmax(0,_1fr))]"],
         ],
       )}
+      style={board && {
+        gridTemplateColumns: "repeat(" + board.width + ", minmax(0, 1fr))",
+        gridTemplateRows: "repeat(" + board.height + ", minmax(0, 1fr))",
+      }}
     >
       {!mesh && (
         <div

@@ -7,8 +7,8 @@ export const View: React.VFC<
     className?: string;
     roomName: string;
     roomSize: number;
-    players: { userId: string; role: number; count: number; isCurrent: boolean; }[] | undefined;
-    nonPlayers: { userId: string; }[];
+    players: { userId: string; name: string; role: number; count: number; isCurrent: boolean; }[] | undefined;
+    nonPlayers: { userId: string; name: string; }[];
   }
 > = ({ className, roomName: roomName, roomSize, players, nonPlayers: nonPlayers }) => {
   return (
@@ -48,49 +48,72 @@ export const View: React.VFC<
       </div>
       <div className={clsx(["flex-grow"], ["mt-4"])}>
         <div>
+          <p className={clsx(["text-cyan-50"], ["text-md"])}>Players</p>
           {players && (
             <ul
               className={clsx(
+                ["mt-2"],
                 ["rounded"],
                 ["bg-cyan-200"],
                 ["border", "border-cyan-100"],
                 ["divide-y", ["divide-cyan-100"]],
               )}
             >
-              {players.map(({ userId }) => (
-                <li key={userId} className={clsx(["px-2"], ["py-1"])}>
-                  <span
-                    className={clsx(
-                      ["block"],
-                      [["text-cyan-800"], ["text-sm"], ["font-mono"]],
-                    )}
-                  >
-                    {userId}
-                  </span>
+              {players.map(({ userId, name, role, isCurrent }) => (
+                <li key={userId} className={clsx(["flex", ["items-center"]], ["px-1"], ["py-1"])}>
+                  <div className={clsx(["bg-cyan-700"], ["px-1"], ["py-1"], ["rounded"])}>
+                    <div
+                      className={clsx(
+                        ["w-6"],
+                        ["h-6"],
+                        ["rounded-full"],
+                        ["border", "border-cyan-100/75"],
+                        [role === STONE_WHITE && ["bg-cyan-800"]],
+                        [role === STONE_BLACK && ["bg-cyan-50"]],
+                      )}
+                    />
+                  </div>
+                  <div className={clsx(["ml-2"], ["overflow-hidden"])}>
+                    <span
+                      className={clsx(["block"], [
+                        ["text-cyan-800"],
+                        ["text-sm"],
+                        [!isCurrent && ["font-normal"], isCurrent && ["font-bold"]],
+                        ["truncate"],
+                        ["font-mono"],
+                      ])}
+                    >
+                      {name}
+                    </span>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </div>
         <div className={clsx(["mt-4"])}>
+          <p className={clsx(["text-cyan-50"], ["text-md"])}>Non Players</p>
           <ul
             className={clsx(
+              ["mt-2"],
               ["rounded"],
               ["bg-cyan-200"],
               ["border", "border-cyan-100"],
               ["divide-y", ["divide-cyan-100"]],
             )}
           >
-            {nonPlayers.map(({ userId }) => (
-              <li key={userId} className={clsx(["px-2"], ["py-1"])}>
-                <span
-                  className={clsx(
-                    ["block"],
-                    [["text-cyan-800"], ["text-sm"], ["font-mono"]],
-                  )}
-                >
-                  {userId}
-                </span>
+            {nonPlayers.map(({ userId, name }) => (
+              <li key={userId} className={clsx(["px-1"], ["py-1"])}>
+                <div className={clsx(["overflow-hidden"])}>
+                  <span
+                    className={clsx(
+                      ["block"],
+                      [["text-cyan-800"], ["text-sm"], ["truncate"], ["font-mono"]],
+                    )}
+                  >
+                    {name}
+                  </span>
+                </div>
               </li>
             ))}
           </ul>
@@ -104,26 +127,34 @@ export const RoomInfo: React.VFC<
   {
     className?: string;
     roomName: string;
-    roomSize: number;
-    users: { userId: string; role: number | undefined; }[];
-    board: { role: number; counts: { [key in number]: number; }; } | undefined;
+    users: Record<string, { name: string; }>;
+    board: {
+      role: number;
+      counts: { [color in number]: number; };
+      players: { [userId in string]: number; };
+    } | undefined;
   }
 > = ({ users, board, ...props }) => {
   const { players, nonPlayers } = useMemo(
     () =>
       board
         ? {
-          players: users.filter(({ role }) => !!role).map(({ userId, role }) => ({
-            userId,
-            role: role!,
-            count: board.counts[role!],
-            isCurrent: board.role === role!,
-          })),
-          nonPlayers: users.filter(({ role }) => !role).map(({ userId }) => ({ userId })),
+          players: Object.entries(board.players).map(
+            ([userId, role]) => ({
+              userId,
+              name: users[userId].name,
+              role,
+              count: board.counts[role],
+              isCurrent: role === board.role,
+            }),
+          ),
+          nonPlayers: Object.entries(users).filter(
+            ([userId]) => !Object.keys(board.players).includes(userId),
+          ).map(([userId, { name }]) => ({ userId, name })),
         }
         : {
           players: undefined,
-          nonPlayers: users.map(({ userId }) => ({ userId })),
+          nonPlayers: Object.entries(users).map(([userId, { name }]) => ({ userId, name })),
         },
     [board, users],
   );
@@ -131,6 +162,7 @@ export const RoomInfo: React.VFC<
   return (
     <View
       {...props}
+      roomSize={Object.keys(users).length}
       players={players}
       nonPlayers={nonPlayers}
     />

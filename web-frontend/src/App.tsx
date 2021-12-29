@@ -6,7 +6,6 @@ import { Room } from "~/pages/Room";
 import { Rooms } from "~/pages/Rooms";
 import { defaultFetcher } from "~/swr/fetcher";
 import { Template } from "~/templates/Template";
-
 export const App: React.VFC = () => {
   return (
     <SWRConfig value={{ fetcher: defaultFetcher }}>

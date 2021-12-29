@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { useParams } from "react-router-dom";
 import { useUserId } from "~/auth/useUserId";
 import { Board } from "~/components/Board";
@@ -11,7 +12,7 @@ export const Room: React.VFC = () => {
 
   const [userId] = useUserId();
   const [room, setRoom] = useState<
-    {
+    | {
       roomName: string;
       users: Record<string, { name: string; connected: boolean; }>;
       board:
@@ -24,11 +25,14 @@ export const Room: React.VFC = () => {
           players: { [userId in string]: number; };
         }
         | undefined;
-    } | undefined
+    }
+    | undefined
   >(undefined);
 
-  const handleNotification = (message: "NOT_YOUR_TIME" | "NOT_PLAYER" | "CANNOT_PLACE_HERE") => {
-    console.log(message);
+  const handleNotification = (
+    message: "NOT_YOUR_TIME" | "NOT_PLAYER" | "CANNOT_PLACE_HERE",
+  ) => {
+    toast(message, { position: "bottom-left" });
   };
   const handleBroadcast = (data: any) => {
     const roomName = data["name"];
@@ -80,52 +84,34 @@ export const Room: React.VFC = () => {
 
   return (
     <main>
-      {room &&
-        (
+      {room && (
+        <div
+          className={clsx(["container"], ["mx-auto"], ["flex"], ["bg-cyan-50"])}
+        >
           <div
             className={clsx(
-              ["container"],
-              ["mx-auto"],
-              ["flex"],
-              ["bg-cyan-50"],
+              ["flex-grow"],
+              ["px-4"],
+              ["py-4"],
+              ["flex", ["justify-center"], ["items-center"]],
             )}
           >
-            <div
-              className={clsx(
-                ["flex-grow"],
-                ["px-4"],
-                ["py-4"],
-                ["flex", ["justify-center"], ["items-center"]],
-              )}
-            >
-              <Board
-                className={clsx(
-                  ["w-[480px]"],
-                  ["h-[480px]"],
-                )}
-                handleClick={handleClick}
-                board={room.board}
-              />
-            </div>
-            <div
-              className={clsx(
-                ["px-4"],
-                ["py-4"],
-                ["flex-shrink"],
-              )}
-            >
-              <RoomInfo
-                className={clsx(
-                  ["max-w-[280px]"],
-                  ["h-full"],
-                )}
-                roomName={room.roomName}
-                users={room.users}
-                board={room.board}
-              />
-            </div>
+            <Board
+              className={clsx(["w-[480px]"], ["h-[480px]"])}
+              handleClick={handleClick}
+              board={room.board}
+            />
           </div>
-        )}
+          <div className={clsx(["px-4"], ["py-4"], ["flex-shrink"])}>
+            <RoomInfo
+              className={clsx(["max-w-[280px]"], ["h-full"])}
+              roomName={room.roomName}
+              users={room.users}
+              board={room.board}
+            />
+          </div>
+        </div>
+      )}
     </main>
   );
 };

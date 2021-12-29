@@ -7,11 +7,17 @@ export class Rooms {
     this.rooms = new Map();
   }
 
-  get roomIds(): string[] {
+  private get roomIds(): string[] {
     return [...this.rooms.entries()].map(([roomId]) => roomId);
   }
 
-  createNewRoom(roomId: string): Room {
+  private notMatchingRoomIds(): string[] {
+    return [...this.rooms.entries()]
+      .filter(([_, room]) => !room.board)
+      .map(([roomId]) => roomId);
+  }
+
+  private createNewRoom(roomId: string): Room {
     const newRoom: Room = {
       id: roomId,
       name: "Room " + roomId,
@@ -22,9 +28,16 @@ export class Rooms {
     return newRoom;
   }
 
+  getRandomRoomId(): string {
+    const roomIds = this.notMatchingRoomIds();
+    if (0 < roomIds.length) {
+      return roomIds[Math.floor(roomIds.length * Math.random())];
+    } else {
+      return this.createNewRoom(crypto.randomUUID()).id;
+    }
+  }
+
   getRoom(roomId: string): Room {
     return this.rooms.get(roomId) || this.createNewRoom(roomId);
   }
 }
-
-export const rooms = new Rooms();

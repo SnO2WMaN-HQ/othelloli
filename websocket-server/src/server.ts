@@ -3,12 +3,14 @@ import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 import { Application, Router } from "https://deno.land/x/oak/mod.ts";
 import { addSocket as addSocketToRoom } from "./room.ts";
 
-import { rooms } from "./rooms.ts";
+import { Rooms } from "./rooms.ts";
 
 import { handleLogin } from "./login.ts";
 
 const app = new Application();
 const router = new Router();
+
+const rooms = new Rooms();
 
 router.get("/login", async (context) => {
   const userId = context.request.url.searchParams.get("userId");
@@ -17,10 +19,8 @@ router.get("/login", async (context) => {
   handleLogin(socket, userId);
 });
 
-router.get("/rooms", (context) => {
-  context.response.body = {
-    rooms: rooms.roomIds.map((roomId) => ({ roomId })),
-  };
+router.get("/random", (context) => {
+  context.response.body = { roomId: rooms.getRandomRoomId() };
 });
 
 router.get("/rooms/:id", async (context) => {
